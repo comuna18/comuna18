@@ -67,7 +67,7 @@ class BaseModel(models.Model):
                     except Exception as e:
                         for obj in objects.all():
                             obj.hard_delete()
-        self.delete()
+        super(BaseModel, self).delete()
 
     def set_calculated_fields(self):
         for field_name in self.calculated_fields:
