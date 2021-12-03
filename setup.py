@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url='https://github.com/comuna18/comuna18',
     license='MIT',
-    packages=['c18'],
+    packages=['comuna18'],
     install_requires=[
         'django',
         'python-dateutil',
