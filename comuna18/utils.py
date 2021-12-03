@@ -1,10 +1,14 @@
-import uuid
+import string
+import random
 
-def generate_random_slug(model, exclude_slugs=[]):
-	while True:
-		random_slug = uuid.uuid4().hex[:model.SLUG_LENGTH].upper()
-		others = model.objects.filter(random_slug=random_slug)
-		if others.count() == 0:
-			if random_slug not in exclude_slugs:
-				return random_slug
-		break
+def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+    random_chain = ''.join(random.choice(chars) for _ in range(size))
+    return random_chain
+
+def generate_random_slug(model, size):
+    while True:
+        random_slug = id_generator(size=size)
+        others = model.objects.filter(random_slug=random_slug)
+        if others.count() == 0:
+            return random_slug
+        break

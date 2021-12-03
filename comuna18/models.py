@@ -19,21 +19,16 @@ class BaseModel(models.Model):
     PREFIX = ''
     IDENTIFIER_TYPE = 'ID'
     calculated_fields = []
-    @property
-    def identifier(self):
-        identifier = ''
-        if self.PREFIX:
-            identifier += self.PREFIX
 
-        if self.IDENTIFIER_TYPE == 'ID':
-            return '{prefix}{id:04}'.format(prefix=identifier, id=self.id)
-        elif self.IDENTIFIER_TYPE == 'SLUG':
-            return '{prefix}{slug}'.format(prefix=identifier, slug=self.random_slug)
+    identifier = models.SlugField(editable=False)
+
+    def get_identifier(self):
+        return '{prefix}{id:07}'.format(prefix=self.PREFIX, id=self.id)
 
     def __str__(self):
         valid_str_names = ('name', 'identifier')
         for valid_str in valid_str_names:
-            if hasattr(self, valid_str):
+            if getattr(self, valid_str, None):
                 return getattr(self, valid_str)
         return super().__str__()
 
@@ -74,26 +69,32 @@ class BaseModel(models.Model):
             setattr(self, field_name, getattr(self, 'get_' + field_name)())
 
     def save(self, *args, **kwargs):
+        self.identifier = self.get_identifier()
         self.set_calculated_fields()
         super().save(*args, **kwargs)
 
 class RandomSlugModel(BaseModel):
 
     IDENTIFIER_TYPE = 'SLUG'
-    SLUG_LENGTH = 6
-    SLUG_IS_PRIMARY_KEY = settings.SLUG_IS_PRIMARY_KEY if hasattr(settings, 'SLUG_IS_PRIMARY_KEY') else False
-    SLUG_IS_NULL = settings.SLUG_IS_NULL if hasattr(settings, 'SLUG_IS_NULL') else False
+    SLUG_LENGTH = getattr(settings, 'SLUG_LENGTH', 6)
+    SLUG_IS_PRIMARY_KEY = getattr(settings, 'SLUG_IS_PRIMARY_KEY', False)
+    SLUG_IS_NULL = getattr(settings, 'SLUG_IS_NULL', False)
+
     random_slug = models.SlugField(editable=False, unique=True, primary_key=SLUG_IS_PRIMARY_KEY, null=SLUG_IS_NULL)
+
+    def get_identifier(self):
+        return '{prefix}{slug}'.format(prefix=self.PREFIX, slug=self.random_slug)
 
     def save(self, *args, **kwargs):
         if not self.random_slug:
-            self.random_slug = generate_random_slug(model=self._meta.model)
+            self.random_slug = generate_random_slug(model=self._meta.model,
+                                                    size=self.SLUG_LENGTH)
         return super().save(*args, **kwargs)
 
     class Meta:
         abstract = True
 
-class ActiveModel(BaseModel):
+class ActiveModel(models.Model):
     ACTIVE_FIELD = 'Activo'
     is_active = models.BooleanField(ACTIVE_FIELD, default=True)
     
@@ -101,7 +102,7 @@ class ActiveModel(BaseModel):
     class Meta:
         abstract = True
 
-class TimestampModel(BaseModel):
+class TimestampModel(models.Model):
 
     create_timestamp = models.DateTimeField('Timestamp de creación', auto_now_add=True, editable=False)
     update_timestamp = models.DateTimeField('Timestamp de modificación', auto_now=True, editable=False)
