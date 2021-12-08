@@ -1,6 +1,7 @@
 from django.urls import reverse, path, include
 from django.views import generic as gv
 from django.conf import settings
+from django_filters.views import FilterView
 
 from .utils import picky_reverse
 
@@ -18,6 +19,8 @@ class AppView():
     """Forms module, module will define form_class=form.NAME for NAME view."""
     include_perms = True
     """Include perms names for module as context"""
+    filter_view = True
+    """Include a FilterView in /lista/"""
 
     views_redirected_to_detail = ['create', 'update']   # Views in module that must be redirected to detail view
     include_in_breadcrumb = True                        # Decide to include or not in breadcrumb
@@ -299,7 +302,10 @@ class AppView():
         methods = filter(lambda m: prefix in m, dir(cls))
         methods_dict = {method_name.replace(prefix, ''): getattr(cls, method_name) for method_name in methods}
         generic_name = 'List' if name == 'Index' else name
-        generic_view = getattr(gv, generic_name + 'View')
+        if name == 'Filter':
+            generic_view = FilterView
+        else:
+            generic_view = getattr(gv, generic_name + 'View')
         return type(name, (cls, generic_view), methods_dict)
 
     @classmethod
@@ -320,7 +326,11 @@ class AppView():
         urlpatterns = [
             path('crear/', cls.get_view('Create'), name='create'),
         ]
-
+        if cls.filter_view:
+            urlpatterns.append(
+                path('lista/', cls.get_view('Filter'), name='filter')
+            )
+    
         if not cls.skip_index:
             urlpatterns.append(path('', cls.get_view('Index'), name='index'))
 
