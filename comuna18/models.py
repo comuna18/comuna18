@@ -13,14 +13,13 @@ class ActiveManager(models.Manager):
         return super().get_queryset().filter(is_active=False)
 
 
-
 class BaseModel(models.Model):
 
     PREFIX = ''
     IDENTIFIER_TYPE = 'ID'
     calculated_fields = []
 
-    identifier = models.SlugField(editable=False)
+    identifier = models.SlugField(editable=False, null=True)
 
     def get_identifier(self):
         return '{prefix}{id:07}'.format(prefix=self.PREFIX, id=self.id)
