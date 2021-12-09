@@ -70,10 +70,11 @@ class AppView():
             return name.lower()
         return name
 
-    def get_slug_url_kwarg(self):
-        if self.slug_url_kwarg:
-            return self.slug_url_kwarg
-        return '{}_slug'.format(self.class_name.lower())
+    @classmethod
+    def get_slug_url_kwarg(cls):
+        if cls.slug_url_kwarg:
+            return cls.slug_url_kwarg
+        return '{}_slug'.format(cls.class_name.lower())
 
     @classmethod
     def get_model_name(cls):
@@ -314,7 +315,7 @@ class AppView():
 
     @classmethod
     def build_urls(cls, object_specific_urls=[]):
-        slug_field_url = '<slug:{}>/'.format(cls.slug_url_kwarg)
+        slug_field_url = '<slug:{}>/'.format(cls.get_slug_url_kwarg)
         object_specific_urls = object_specific_urls + [
             path('editar/', cls.get_view('Update'), name='update'),
             path('borrar/', cls.get_view('Delete'), name='delete'),
