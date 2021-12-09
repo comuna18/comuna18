@@ -18,6 +18,6 @@ setuptools.setup(
         'django',
         'python-dateutil',
         'django-crispy-forms',
-        'dango-filter',
+        'django-filter',
     ],
 )
