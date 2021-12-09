@@ -315,7 +315,7 @@ class AppView():
 
     @classmethod
     def build_urls(cls, object_specific_urls=[]):
-        slug_field_url = '<slug:{}>/'.format(cls.get_slug_url_kwarg)
+        slug_field_url = '<slug:{}>/'.format(cls.get_slug_url_kwarg())
         object_specific_urls = object_specific_urls + [
             path('editar/', cls.get_view('Update'), name='update'),
             path('borrar/', cls.get_view('Delete'), name='delete'),
