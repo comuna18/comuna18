@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name='c18',
-    version='1.1',
+    version='2.0',
     author='Abraham Mercado',
     author_email='abraham@comuna18.com',
     description='Comuna 18 base build',

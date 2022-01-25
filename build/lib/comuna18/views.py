@@ -1,22 +1,33 @@
 from django.urls import reverse, path, include
-from django.views import generic as GV
+from django.views import generic as gv
 from django.conf import settings
-from django.urls import reverse
+from django_filters.views import FilterView
+
+from .utils import picky_reverse
+
 
 class AppView():
+    # Module level config
     model = None
-    previous_module = None                              # MUST be changed to inheritance mode if possible
-    module_name = ''                                    # Name used to refer in urls and directories
-    slug_field = 'random_slug'                          # Field to filter object by
-    slug_url_kwarg = ''                                 # Slug name in url kwargs
+    slug_field = 'random_slug'
+    slug_url_kwarg = ''
+    previous_module = None
+    """Previous Module, must inherit from AppView"""
+    module_name = ''
+    """Module name, use to references in app_names and directories """
+    forms = None
+    """Forms module, module will define form_class=form.NAME for NAME view."""
+    include_perms = True
+    """Include perms names for module as context"""
+    filter_view = True
+    """Include a FilterView in /lista/"""
+
     views_redirected_to_detail = ['create', 'update']   # Views in module that must be redirected to detail view
-    forms = None                                        # forms module, form names must match views names
     include_in_breadcrumb = True                        # Decide to include or not in breadcrumb
     generate_breadcrumb = True
     extra_index_fields = {}                             # Fields to show in default index template
     include_object_index = False
     include_detail_fields = False
-    include_perms = True
     excluded_detail_fields = ['id', 'random_slug']
     proxy_name = None                                   # Treat view as this name, ex: If you have multiple creates you could use proxy_name=Create in both
     include_common_urls = True                          # Include generic urls in context data (create for index, update and delete for detail)
@@ -32,6 +43,23 @@ class AppView():
     index_default_template = '_base_index.html'
     detail_default_template = '_base_detail.html'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.class_name = self.get_class_name()
+        self.slug_url_kwarg = self.get_slug_url_kwarg()
+        self.templates_root = self.get_root('/')
+        self.path_root = self.get_root(':')
+        if self.model:
+            self.model_fields = [field.name for field in self.model._meta.fields]
+        print(self.class_name)
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.kwargs_tuple = [(key, value) for key, value in self.kwargs.items()]
+        self.kwargs_objects = self.get_kwargs_objects(self.kwargs)
+        for k, v in self.kwargs_objects.items():
+            setattr(self, k, v)
+
     # ======================== GENERAL ================================
     def get_class_name(self, lower=True):
         if self.proxy_name:
@@ -41,12 +69,25 @@ class AppView():
         if lower:
             return name.lower()
         return name
+
+    @classmethod
+    def get_slug_url_kwarg(cls):
+        if cls.slug_url_kwarg:
+            return cls.slug_url_kwarg
+        return '{}_slug'.format(cls.class_name.lower())
+
+    @classmethod
+    def get_model_name(cls):
+        return cls.model.__name__.lower()
     # =================== TEMPLATE =======================
-    def get_root(self, separator):
+
+    @classmethod
+    def get_root(cls, separator):
         root = ''
-        if self.previous_module:
-            root += self.previous_module().get_root(separator)
-        root += self.module_name + separator
+        if cls.previous_module:
+            root += cls.previous_module.get_root(separator)
+        root += cls.module_name + separator
+        # print('get_root', separator)
         return root
 
     def get_default_template(self, name):
@@ -60,28 +101,22 @@ class AppView():
             return self.default_templates_root + self.detail_default_template
 
     def get_template_names(self):
-        name = self.get_class_name()
+        name = self.class_name.lower()
         if self.template_name is None:
-            if self.templates_root is None:
-                root = self.get_root('/')
-            else:
-                root = self.templates_root
-            return ['{}{}.html'.format(root, name ), self.get_default_template(name)]
+            return ['{}{}.html'.format(self.templates_root, name), self.get_default_template(name)]
         return [self.template_name]
 
     # ========================== URLS ====================
-
-    def get_url_kwargs(self, view):
+    @classmethod
+    def get_url_kwargs(cls, view):
         kwargs = {}
-        if self.previous_module:
-            previous_module_instance = self.previous_module()
-            kwargs = previous_module_instance.get_url_kwargs(view)
-        if hasattr(self,'model'):
-            slug_name = self.slug_url_kwarg
+        if cls.previous_module:
+            kwargs = cls.previous_module.get_url_kwargs(view)
+        if hasattr(cls, 'model'):
             view_kwargs = view.kwargs
-            if slug_name in view_kwargs.keys():
+            if cls.slug_url_kwarg in view_kwargs.keys():
                 kwargs.update({
-                    slug_name:view_kwargs.get(slug_name),
+                    cls.slug_url_kwarg: view_kwargs.get(cls.slug_url_kwarg),
                 })
         return kwargs
 
@@ -89,82 +124,74 @@ class AppView():
         if self.skip_detail:
             return self.get_index_url(view)
         kwargs = self.get_url_kwargs(view)
-        if (object==None) and hasattr(self, 'object'):
+        if (object is None) and hasattr(self, 'object'):
             object = self.object
         if object:
             kwargs.update({
                 self.slug_url_kwarg: object.identifier
             })
-        path = self.get_root(':') + name
-        return reverse(path, kwargs=kwargs)
+        path = self.path_root + name
+        return picky_reverse(path, view.kwargs_tuple)
 
     def get_index_url(self, view, name='index'):
         if self.skip_index:
             return self.previous_module().get_detail_url(view)
-        path = self.get_root(':') + name
-        kwargs = self.get_url_kwargs(view)
-        if self.slug_url_kwarg in kwargs.keys():
-            del kwargs[self.slug_url_kwarg]
-        return reverse(path, kwargs=kwargs)
+        path = self.path_root + name
+        return picky_reverse(path, view.kwargs_tuple)
 
     def get_success_url(self):
         if self.get_class_name() in self.views_redirected_to_detail:
             return self.get_detail_url(self)
         return self.get_index_url(self)
+
     # =========================== FORMS =====================================
     def get_form_class(self):
         try:
             if super().get_form_class():
                 return super().get_form_class()
         except Exception as e:
-            print(e)
-            print(self.forms)
-        return getattr(self.forms, self.get_class_name(lower=False))
+            pass
+        try:
+            return getattr(self.forms, self.get_class_name(lower=False))
+        except Exception as e:
+            self.fields = '__all__'
+            return super().get_form_class()
 
     def form_valid(self, form):
-        objects = self.get_kwargs_objects(self)
-        model_name = self.model.__name__.lower()
-        if model_name in objects.keys():
-            del objects[model_name]
-        for key in objects.keys():
-            setattr(form.instance, key, objects.get(key))
+        objects = self.get_kwargs_objects(self.kwargs)
+        for key, value in objects.items():
+            if key in self.model_fields:
+                setattr(form.instance, key, value)
         return super().form_valid(form)
 
     # ========================== FILTER QS ===============================
     def get_queryset(self):
         qs = super().get_queryset()
-        objects = self.get_kwargs_objects(self)
-        model_name = self.model.__name__.lower()
-        if model_name in objects.keys():
-            del objects[model_name]
-        sample = qs.first()
-        keys = list(objects.keys())
-        for k in keys:
-            if not hasattr(sample, k):
-                del objects[k]
-        return qs.filter(**objects)
+        objects = self.get_kwargs_objects(self.kwargs)
+        return qs.filter(**{k: v for k, v in objects.items() if k in self.model_fields})
 
     # ========================== BREADCRUMB ====================
     def get_breadcrumb_name(self):
         if self.breadcrumb_name:
             return self.breadcrumb_name
         name = self.get_class_name()
-        if 'create'in name:
+        if 'create' in name:
             return 'Nuevo'
-        if 'update'in name:
+        if 'update' in name:
             return 'Editar'
-        if 'delete'in name:
+        if 'delete' in name:
             return 'Eliminar'
-        if 'detail'in name:
+        if 'detail' in name:
             return self.object
 
-    def get_bc_object(self,view):
+    def get_bc_object(self, view):
         slug_name = self.slug_url_kwarg
         return self.model.objects.get(**{self.slug_field: view.kwargs.get(slug_name)})
 
     def get_breadcrumb(self, view):
         breadcrumb = []
         if self.previous_module:
+            print('init prev')
             previous_module = self.previous_module()
             if previous_module.include_in_breadcrumb:
                 breadcrumb = previous_module.get_breadcrumb(view)
@@ -174,14 +201,15 @@ class AppView():
             breadcrumb.append([self.get_index_url(view), ib_name])
         name = self.get_class_name()
 
-        if  self!=view and (not self.skip_detail):
+        if self != view and (not self.skip_detail):
             breadcrumb.append([self.get_detail_url(view), self.get_bc_object(view)])
 
-        if self==view and ('index' not in name):
-            if (('update'in name) or ('delete' in name)):
+        if self == view and ('index' not in name):
+            if (('update' in name) or ('delete' in name)):
                 breadcrumb.append([self.get_detail_url(view), self.get_bc_object(view)])
-            breadcrumb.append(['',self.get_breadcrumb_name()])
+            breadcrumb.append(['', self.get_breadcrumb_name()])
         return breadcrumb
+
     # ========================== PERMS ====================
     def get_perms(self):
         user = self.request.user
@@ -193,22 +221,15 @@ class AppView():
             'can_delete': user.has_perm('{}.{}_{}'.format(app_label, 'delete', model_name)),
         }
 
-
     # ========================== CONTEXT ====================
-    def get_kwargs_objects(self, view):
-        objects = {}
-        if self.previous_module:
-            previous_module_instance = self.previous_module()
-            objects = previous_module_instance.get_kwargs_objects(view)
-        if self.model:
-            model = self.model
-            model_name = model.__name__.lower()
-            slug_name = self.slug_url_kwarg
-            view_kwargs = view.kwargs
-            if slug_name in view_kwargs.keys():
-                objects.update({
-                    model_name: model.objects.get(**{self.slug_field:view_kwargs.get(slug_name)}),
-                })
+    def get_kwargs_objects(self, kwargs):
+        objects, module = {}, self
+        while module:
+            if module.model and kwargs.get(module.slug_url_kwarg):
+                objects[module.get_model_name()] = module.model.objects.get(
+                    **{module.slug_field: kwargs.get(module.slug_url_kwarg)}
+                )
+            module = module.previous_module
         return objects
 
     def get_index_object_list(self, view, object_list):
@@ -238,19 +259,20 @@ class AppView():
 
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
+        kwargs = self.kwargs
         context.update({
             'model_name': self.model._meta.verbose_name_plural if self.model else '',
 
-            **self.get_kwargs_objects(self),
+            **self.get_kwargs_objects(kwargs),
         })
 
         if self.include_perms:
             context.update(self.get_perms())
 
-        if self.include_object_index:
-            context.update({
-                'index_object_list': self.get_index_object_list(self, context.get('object_list', [])),
-            })
+        # if self.include_object_index:
+        #     context.update({
+        #         'index_object_list': self.get_index_object_list(self, context.get('object_list', [])),
+        #     })
 
         if self.include_detail_fields and ('detail' in self.get_class_name()):
             context.update({
@@ -274,20 +296,17 @@ class AppView():
                 })
         return context
 
-    #=================================== VIEW GENERATOR ==========================
+    # ================================== VIEW GENERATOR ==========================
     @classmethod
     def build_view(cls, name):
         prefix = name.lower() + '__'
-        # methods = filter(lambda m: prefix in m, dir(cls))
-        methods = [m for m in dir(cls) if prefix in m]
-        # methods_dict = {method_name.replace(prefix, '') : getattr(cls, method_name) for method_name in methods}
-        methods_dict = {}
-        for method_name in methods:
-            methods_dict[method_name.replace(prefix, '')] = getattr(cls, method_name)
-
-
-        generic_name = 'List' if name=='Index' else name
-        generic_view = getattr(GV, generic_name + 'View')
+        methods = filter(lambda m: prefix in m, dir(cls))
+        methods_dict = {method_name.replace(prefix, ''): getattr(cls, method_name) for method_name in methods}
+        generic_name = 'List' if name == 'Index' else name
+        if name == 'Filter':
+            generic_view = FilterView
+        else:
+            generic_view = getattr(gv, generic_name + 'View')
         return type(name, (cls, generic_view), methods_dict)
 
     @classmethod
@@ -296,7 +315,7 @@ class AppView():
 
     @classmethod
     def build_urls(cls, object_specific_urls=[]):
-        slug_field_url = '<slug:{}>/'.format(cls.slug_url_kwarg)
+        slug_field_url = '<slug:{}>/'.format(cls.get_slug_url_kwarg())
         object_specific_urls = object_specific_urls + [
             path('editar/', cls.get_view('Update'), name='update'),
             path('borrar/', cls.get_view('Delete'), name='delete'),
@@ -308,12 +327,13 @@ class AppView():
         urlpatterns = [
             path('crear/', cls.get_view('Create'), name='create'),
         ]
-
+        if cls.filter_view:
+            urlpatterns.append(
+                path('lista/', cls.get_view('Filter'), name='filter')
+            )
+    
         if not cls.skip_index:
             urlpatterns.append(path('', cls.get_view('Index'), name='index'))
 
         urlpatterns.append(path(slug_field_url, include(object_specific_urls)))
         return urlpatterns
-
-
-

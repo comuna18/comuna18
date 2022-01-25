@@ -1,9 +1,13 @@
 import string
 import random
 
+from django.urls import reverse_lazy, reverse
+
+
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     random_chain = ''.join(random.choice(chars) for _ in range(size))
     return random_chain
+
 
 def generate_random_slug(model, size):
     while True:
@@ -12,3 +16,16 @@ def generate_random_slug(model, size):
         if others.count() == 0:
             return random_slug
         break
+
+
+def picky_reverse(path, kwargs_list=()):
+    i = 0
+    while i<5:
+        print('picky',i, path, kwargs_list)
+        try:
+            kwargs = dict(kwargs_list)
+            return reverse(path, kwargs=kwargs)
+        except Exception as e:
+            print(e)
+            kwargs_list = kwargs_list[:-1]
+            i += 1

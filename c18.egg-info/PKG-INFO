@@ -1,14 +1,17 @@
 Metadata-Version: 2.1
 Name: c18
-Version: 1.0
+Version: 2.0
 Summary: Comuna 18 base build
 Home-page: https://github.com/comuna18/comuna18
 Author: Abraham Mercado
 Author-email: abraham@comuna18.com
 License: MIT
-Description: pip install git+ssh://git@github.com/comuna18/comuna18.git
-        pipenv install git+ssh://git@github.com/comuna18/comuna18.git#egg=comuna18
-        
-        
 Platform: UNKNOWN
 Description-Content-Type: text/markdown
+License-File: LICENSE
+
+pip install git+ssh://git@github.com/comuna18/comuna18.git
+pipenv install git+ssh://git@github.com/comuna18/comuna18.git#egg=comuna18
+
+
+
