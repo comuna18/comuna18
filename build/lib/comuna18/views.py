@@ -61,11 +61,12 @@ class AppView():
             setattr(self, k, v)
 
     # ======================== GENERAL ================================
-    def get_class_name(self, lower=True):
-        if self.proxy_name:
-            name = self.proxy_name
+    @classmethod
+    def get_class_name(cls, lower=True):
+        if cls.proxy_name:
+            name = cls.proxy_name
         else:
-            name = type(self).__name__
+            name = cls.__name__
         if lower:
             return name.lower()
         return name
@@ -74,7 +75,7 @@ class AppView():
     def get_slug_url_kwarg(cls):
         if cls.slug_url_kwarg:
             return cls.slug_url_kwarg
-        return '{}_slug'.format(cls.class_name.lower())
+        return '{}_slug'.format(cls.get_class_name().lower())
 
     @classmethod
     def get_model_name(cls):
