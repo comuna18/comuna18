@@ -1,4 +1,0 @@
-django
-python-dateutil
-django-crispy-forms
-django-filter

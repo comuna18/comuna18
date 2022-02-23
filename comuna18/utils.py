@@ -18,14 +18,10 @@ def generate_random_slug(model, size):
         break
 
 
-def picky_reverse(path, kwargs_list=()):
-    i = 0
-    while i<5:
-        print('picky',i, path, kwargs_list)
+def picky_reverse(path, kwargs_list=[]):
+    while True:
         try:
             kwargs = dict(kwargs_list)
             return reverse(path, kwargs=kwargs)
         except Exception as e:
-            print(e)
             kwargs_list = kwargs_list[:-1]
-            i += 1
