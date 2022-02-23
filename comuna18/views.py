@@ -55,6 +55,7 @@ class AppView(AccessMixin):
     delete_default_template = '_base_delete.html'
     index_default_template = '_base_index.html'
     detail_default_template = '_base_detail.html'
+    filter_default_template = '_base_filter.html'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
